@@ -11,6 +11,7 @@ import pandas as pd
 from config import Config
 from get_family_ids import get_family_ids
 from get_main_table import get_main_table
+from get_classes import get_classes
 from get_applicants_inventors import get_applicants_inventors_data
 from data_analysis_applicants_inventors import (
     calculate_applicants_inventors_counts,
@@ -103,11 +104,23 @@ def run_full_analysis(
         family_ids_path, range_limit=range_limit  # Pass the range_limit here if needed
     )
 
-    # Step 3: Save the main table data if requested
+    # Step 3: Get class data using the saved file
+    logger.info("Step 3: Getting class data...")
+    df_classes = get_classes(family_ids_path, range_limit=range_limit)
+
+    # Step 4: Merge class data into the main table
+    if not df_main_table.empty and not df_classes.empty:
+        logger.info("Merging class data into main table...")
+        df_main_table = pd.merge(
+            df_main_table, df_classes, on="docdb_family_id", how="left"
+        )
+        logger.info("Class data merged successfully.")
+
+    # Step 5: Save the enriched main table data if requested
     if save_results and not df_main_table.empty:
         main_table_path = target_dir / "main_table.csv"
         df_main_table.to_csv(main_table_path, index=False)
-        logger.info(f"Saved main table data to {main_table_path}")
+        logger.info(f"Saved enriched main table data to {main_table_path}")
 
     # Step 4: Get applicants/inventors data using the same saved file
     logger.info("Step 4: Getting applicants/inventors data...")

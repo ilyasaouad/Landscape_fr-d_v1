@@ -21,7 +21,8 @@ st.title("📊 Patent Applicants & Inventors Data Viewer")
 #    r"C:\Users\iao\Desktop\Landscape_Fråd_v1\output\G06N10\main_G06N10_table.csv"
 #)
 
-analyse_3 = r"C:\Users\iao\Desktop\Landscape_Fråd_v1\DataTables_NO_2020_2020\main_table.csv"
+#analyse_3 = r"C:\Users\iao\Desktop\Landscape_Fråd_v1\DataTables_NO_2020_2020\main_table.csv"
+analyse_3= r"C:\Users\iao\Desktop\Landscape_Fråd_v1\DataTables_NO_2020_2020\main_table_agg.csv"
 
 
 # ---------------------------------

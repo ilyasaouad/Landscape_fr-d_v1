@@ -257,10 +257,6 @@ def run_full_analysis(
     logger.info("Step 1: Getting family IDs...")
     df_family_ids = get_family_ids(country_code, start_year, end_year)
 
-    # ---------------------
-    # for test
-    df_family_ids = df_family_ids.head(5)
-    # ---------------------
 
     if df_family_ids.empty:
         logger.warning("No data found - returning empty DataFrame")
@@ -295,17 +291,23 @@ def run_full_analysis(
         df_priority_auth,
         on="docdb_family_id",
         how="left",
-        suffixes=("_base", "_priority"),   
+        suffixes=("_base", "_priority"),
     )
 
     # Now, drop the old base column and rename the new priority column
     if "priority_auth_base" in df_main_table_priority.columns:
-        df_main_table_priority = df_main_table_priority.drop(columns=['priority_auth_base'])
+        df_main_table_priority = df_main_table_priority.drop(
+            columns=["priority_auth_base"]
+        )
     if "priority_auth_priority" in df_main_table_priority.columns:
-        df_main_table_priority = df_main_table_priority.rename(columns={'priority_auth_priority': 'priority_auth'})
+        df_main_table_priority = df_main_table_priority.rename(
+            columns={"priority_auth_priority": "priority_auth"}
+        )
 
     # Fill any remaining NaNs that might have been created
-    df_main_table_priority["priority_auth"] = df_main_table_priority["priority_auth"].fillna("Unknown")
+    df_main_table_priority["priority_auth"] = df_main_table_priority[
+        "priority_auth"
+    ].fillna("Unknown")
 
     # Apply the comprehensive fallback logic to update remaining 'Unknown' values
     df_main_table_priority = update_missing_priority_auth(df_main_table_priority)
@@ -326,14 +328,18 @@ def run_full_analysis(
 
     # Clean up duplicate columns from merge
     if "cpc_classes_main" in df_main_table_priority_classes.columns:
-        df_main_table_priority_classes = df_main_table_priority_classes.drop(columns=["cpc_classes_main"])
+        df_main_table_priority_classes = df_main_table_priority_classes.drop(
+            columns=["cpc_classes_main"]
+        )
     if "cpc_classes_classes" in df_main_table_priority_classes.columns:
         df_main_table_priority_classes = df_main_table_priority_classes.rename(
             columns={"cpc_classes_classes": "cpc_classes"}
         )
-    
+
     if "main_ipc_group_main" in df_main_table_priority_classes.columns:
-        df_main_table_priority_classes = df_main_table_priority_classes.drop(columns=["main_ipc_group_main"])
+        df_main_table_priority_classes = df_main_table_priority_classes.drop(
+            columns=["main_ipc_group_main"]
+        )
     if "main_ipc_group_classes" in df_main_table_priority_classes.columns:
         df_main_table_priority_classes = df_main_table_priority_classes.rename(
             columns={"main_ipc_group_classes": "main_ipc_group"}
@@ -341,10 +347,16 @@ def run_full_analysis(
 
     # Save intermediate result
     if save_results:
-        main_table_priority_classes_path = target_dir / "main_table_priority_classes.csv"
-        df_main_table_priority_classes.to_csv(main_table_priority_classes_path, index=False)
-        logger.info(f"Saved main table with priority and classes to {main_table_priority_classes_path}")
-     
+        main_table_priority_classes_path = (
+            target_dir / "main_table_priority_classes.csv"
+        )
+        df_main_table_priority_classes.to_csv(
+            main_table_priority_classes_path, index=False
+        )
+        logger.info(
+            f"Saved main table with priority and classes to {main_table_priority_classes_path}"
+        )
+
     # Step 6: Aggregate main table data
     logger.info("Step 6: Aggregating main table data...")
     # First save the merged table to CSV, then aggregate it
@@ -352,16 +364,132 @@ def run_full_analysis(
     df_main_table_priority_classes.to_csv(temp_priority_classes_path, index=False)
     df_main_agg = aggregate_main_table(temp_priority_classes_path)
 
-    # Step 7: Get applicant/inventor data for representative applications
-    logger.info("Step 7: Getting applicants/inventors data...")
+    # Step 6b: Add auth_family column with aggregated appln_auth values
+    logger.info("Step 6b: Adding auth_family column...")
+    # Group by docdb_family_id and aggregate all unique appln_auth values
+    auth_family_map = (
+        df_main_table_priority_classes.groupby("docdb_family_id")["appln_auth"]
+        .apply(lambda x: ", ".join(sorted(set(x))))
+        .to_dict()
+    )
+    df_main_agg["auth_family"] = df_main_agg["docdb_family_id"].map(auth_family_map)
+
+    # Step 7: Add sector and field columns from IPC mapping
+    logger.info("Step 7: Adding sector and field columns from IPC mapping...")
+    ipc_mapping_path = Path(
+        r"C:\Users\iao\Desktop\Landscape_Fråd_v1\ipc_technology_eng.xlsx"
+    )
+
+    try:
+        df_ipc_mapping = pd.read_excel(ipc_mapping_path)
+        logger.info(f"Loaded IPC mapping from {ipc_mapping_path}")
+
+        # Assuming the Excel file has columns like 'main_ipc_group', 'sector', 'field'
+        # Create a mapping dictionary from main_ipc_group to sector and field
+        sector_map = dict(
+            zip(df_ipc_mapping["main_ipc_group"], df_ipc_mapping["sector"])
+        )
+        field_map = dict(zip(df_ipc_mapping["main_ipc_group"], df_ipc_mapping["field"]))
+
+        # Map the values to main_table_agg
+        df_main_agg["sector"] = df_main_agg["main_ipc_group"].map(sector_map)
+        df_main_agg["field"] = df_main_agg["main_ipc_group"].map(field_map)
+
+        logger.info("Successfully added sector and field columns")
+    except FileNotFoundError:
+        logger.warning(
+            f"IPC mapping file not found at {ipc_mapping_path}. Skipping sector/field mapping."
+        )
+        df_main_agg["sector"] = "N/A"
+        df_main_agg["field"] = "N/A"
+    except Exception as e:
+        logger.warning(
+            f"Error loading IPC mapping: {e}. Skipping sector/field mapping."
+        )
+        df_main_agg["sector"] = "N/A"
+        df_main_agg["field"] = "N/A"
+
+    # Save the aggregated table with sector and field to CSV
+    agg_output_path = target_dir / "main_table_agg.csv"
+
+    # Reorganize columns to put key columns first
+    key_columns = [
+        "docdb_family_id",
+        "application_number",
+        "appln_auth",
+        "auth_family",
+        "priority_auth",
+        "sector",
+        "field",
+    ]
+
+    # Get remaining columns (those not in key_columns)
+    remaining_columns = [col for col in df_main_agg.columns if col not in key_columns]
+
+    # Reorder the dataframe
+    df_main_agg = df_main_agg[key_columns + remaining_columns]
+
+    df_main_agg.to_csv(agg_output_path, index=False)
+    logger.info(f"Saved aggregated data with sector and field to {agg_output_path}")
+
+    # Step 8: Get applicant/inventor data for representative applications
+    logger.info("Step 8: Getting applicants/inventors data...")
     _, df_applicants_inventors = get_applicants_inventors_data(family_ids_path)
 
-    # Step 8: Final merge
-    logger.info("Step 8: Merging all data on 'docdb_family_id'...")
-    # Use the aggregated main table as the base for the final merge
-    df_final = pd.merge(df_main_agg, df_applicants_inventors, on="docdb_family_id", how="left")
+    # Step 8b: Reorganize main_table_agg columns
+    logger.info("Step 8b: Reorganizing columns...")
+    key_columns = [
+        "docdb_family_id",
+        "application_number",
+        "appln_auth",
+        "auth_family",
+        "priority_auth",
+    ]
 
-    # Step 9: Save results if requested
+    # Identify class columns (IPC/CPC)
+    class_cols = [
+        col
+        for col in df_main_agg.columns
+        if "class" in col.lower() or "ipc" in col.lower()
+    ]
+
+    # Identify sector and field columns
+    sector_field_cols = []
+    if "sector" in df_main_agg.columns:
+        sector_field_cols.append("sector")
+    if "field" in df_main_agg.columns:
+        sector_field_cols.append("field")
+
+    # Get remaining columns (excluding key, class, and sector/field columns)
+    remaining_columns = [
+        col
+        for col in df_main_agg.columns
+        if col not in key_columns
+        and col not in class_cols
+        and col not in sector_field_cols
+    ]
+
+    # New order: key columns + other columns + class columns + sector + field
+    final_column_order = (
+        key_columns + remaining_columns + class_cols + sector_field_cols
+    )
+
+    # Keep only columns that exist
+    final_column_order = [
+        col for col in final_column_order if col in df_main_agg.columns
+    ]
+    df_main_agg = df_main_agg[final_column_order]
+
+    logger.info(f"Column order: {', '.join(final_column_order[:10])}...")
+
+    # Step 9: Final merge
+    logger.info("Step 9: Merging all data on 'docdb_family_id'...")
+    # Use the aggregated main table as the base for the final merge
+    df_final = pd.merge(
+        df_main_agg, df_applicants_inventors, on="docdb_family_id", how="left"
+    )
+
+    # Step 10: Save results if requested
     if save_results:
         final_path = target_dir / "analysis_results_final.csv"
         df_final.to_csv(final_path, index=False)

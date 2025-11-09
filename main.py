@@ -240,11 +240,6 @@ def run_full_analysis(
     logger.info("Step 1: Getting family IDs...")
     df_family_ids = get_family_ids(country_code, start_year, end_year)
 
-    # ---------------------
-    # for test
-    df_family_ids = df_family_ids.head(5)
-    # ---------------------
-
     if df_family_ids.empty:
         logger.warning("No data found - returning empty DataFrame")
         return pd.DataFrame()

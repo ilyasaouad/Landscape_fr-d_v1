@@ -1,7 +1,6 @@
 """
 Main module for patent analysis - orchestrates all functionality.
 """
-
 import sys
 import logging
 from pathlib import Path
@@ -98,7 +97,7 @@ def aggregate_main_table(main_table_path: Path) -> pd.DataFrame:
 
     logger.info(f"Aggregated data: {len(df_main_agg)} families")
     logger.info(f"Columns after aggregation: {df_main_agg.columns.tolist()}")
-
+    
     return df_main_agg
 
 
@@ -284,18 +283,12 @@ def run_full_analysis(
 
     # Drop the old base column and rename the new priority column
     if "priority_auth_base" in df_main_table_priority.columns:
-        df_main_table_priority = df_main_table_priority.drop(
-            columns=["priority_auth_base"]
-        )
+        df_main_table_priority = df_main_table_priority.drop(columns=['priority_auth_base'])
     if "priority_auth_priority" in df_main_table_priority.columns:
-        df_main_table_priority = df_main_table_priority.rename(
-            columns={"priority_auth_priority": "priority_auth"}
-        )
+        df_main_table_priority = df_main_table_priority.rename(columns={'priority_auth_priority': 'priority_auth'})
 
     # Fill any remaining NaNs
-    df_main_table_priority["priority_auth"] = df_main_table_priority[
-        "priority_auth"
-    ].fillna("Unknown")
+    df_main_table_priority["priority_auth"] = df_main_table_priority["priority_auth"].fillna("Unknown")
 
     # Apply the comprehensive fallback logic
     df_main_table_priority = update_missing_priority_auth(df_main_table_priority)
@@ -316,18 +309,14 @@ def run_full_analysis(
 
     # Clean up duplicate columns from merge
     if "cpc_classes_main" in df_main_table_priority_classes.columns:
-        df_main_table_priority_classes = df_main_table_priority_classes.drop(
-            columns=["cpc_classes_main"]
-        )
+        df_main_table_priority_classes = df_main_table_priority_classes.drop(columns=["cpc_classes_main"])
     if "cpc_classes_classes" in df_main_table_priority_classes.columns:
         df_main_table_priority_classes = df_main_table_priority_classes.rename(
             columns={"cpc_classes_classes": "cpc_classes"}
         )
-
+    
     if "main_ipc_group_main" in df_main_table_priority_classes.columns:
-        df_main_table_priority_classes = df_main_table_priority_classes.drop(
-            columns=["main_ipc_group_main"]
-        )
+        df_main_table_priority_classes = df_main_table_priority_classes.drop(columns=["main_ipc_group_main"])
     if "main_ipc_group_classes" in df_main_table_priority_classes.columns:
         df_main_table_priority_classes = df_main_table_priority_classes.rename(
             columns={"main_ipc_group_classes": "main_ipc_group"}
@@ -335,15 +324,9 @@ def run_full_analysis(
 
     # Save intermediate result
     if save_results:
-        main_table_priority_classes_path = (
-            target_dir / "main_table_priority_classes.csv"
-        )
-        df_main_table_priority_classes.to_csv(
-            main_table_priority_classes_path, index=False
-        )
-        logger.info(
-            f"Saved main table with priority and classes to {main_table_priority_classes_path}"
-        )
+        main_table_priority_classes_path = target_dir / "main_table_priority_classes.csv"
+        df_main_table_priority_classes.to_csv(main_table_priority_classes_path, index=False)
+        logger.info(f"Saved main table with priority and classes to {main_table_priority_classes_path}")
 
     # Step 6: Aggregate main table data
     logger.info("Step 6: Aggregating main table data...")
@@ -351,7 +334,7 @@ def run_full_analysis(
     temp_priority_classes_path = target_dir / "temp_main_table_priority_classes.csv"
     df_main_table_priority_classes.to_csv(temp_priority_classes_path, index=False)
     df_main_agg = aggregate_main_table(temp_priority_classes_path)
-
+    
     # Step 6b: Add auth_family column with aggregated appln_auth values
     logger.info("Step 6b: Adding auth_family column...")
     # Group by docdb_family_id and aggregate all unique appln_auth values
@@ -364,106 +347,92 @@ def run_full_analysis(
 
     # Step 7: Add sector and field columns from IPC mapping
     logger.info("Step 7: Adding sector and field columns from IPC mapping...")
-    ipc_mapping_path = Path(
-        r"C:\Users\iao\Desktop\Landscape_Fråd_v1\ipc_technology_eng.xlsx"
-    )
-
+    ipc_mapping_path = Path(r"C:\Users\iao\Desktop\Landscape_Fråd_v1\ipc_technology_eng.xlsx")
+    
     try:
         df_ipc_mapping = pd.read_excel(ipc_mapping_path)
         logger.info(f"Loaded IPC mapping from {ipc_mapping_path}")
-
+        
         # Initialize sector and field columns
         df_main_agg["sector"] = "N/A"
         df_main_agg["field"] = "N/A"
-
+        
         # Function to normalize IPC code
         def normalize_ipc(ipc_code):
             """Normalize IPC code to base format for comparison"""
-            normalized = str(ipc_code).replace(" ", "").upper()
-            normalized = normalized.split("%")[0]
-            normalized = normalized.split("/")[0]
+            normalized = str(ipc_code).replace(' ', '').upper()
+            normalized = normalized.split('%')[0]
+            normalized = normalized.split('/')[0]
             return normalized
-
+        
         # Function to find matching sector and field
         def find_sector_field(ipc_code):
-            if pd.isna(ipc_code) or ipc_code == "" or ipc_code == "N/A":
+            if pd.isna(ipc_code) or ipc_code == '' or ipc_code == 'N/A':
                 return "N/A", "N/A"
-
+            
             ipc_normalized = normalize_ipc(ipc_code)
-
+            
             for idx, row in df_ipc_mapping.iterrows():
                 try:
-                    ipc_codes_str = str(row["IPC_code"]).strip()
-                    sector = (
-                        str(row["Sector_en"])
-                        if "Sector_en" in df_ipc_mapping.columns
-                        else "N/A"
-                    )
-                    field = (
-                        str(row["Field_en"])
-                        if "Field_en" in df_ipc_mapping.columns
-                        else "N/A"
-                    )
-
+                    ipc_codes_str = str(row['IPC_code']).strip()
+                    sector = str(row['Sector_en']) if 'Sector_en' in df_ipc_mapping.columns else "N/A"
+                    field = str(row['Field_en']) if 'Field_en' in df_ipc_mapping.columns else "N/A"
+                    
                     # Split multiple IPC codes by comma
-                    ipc_patterns = [p.strip() for p in ipc_codes_str.split(",")]
-
+                    ipc_patterns = [p.strip() for p in ipc_codes_str.split(',')]
+                    
                     for pattern in ipc_patterns:
                         pattern = pattern.strip()
                         if not pattern:
                             continue
-
+                        
                         # Normalize the pattern
                         pattern_normalized = normalize_ipc(pattern)
-
+                        
                         # Check for exact match
                         if ipc_normalized == pattern_normalized:
                             return sector, field
-
+                        
                         # Check if our code starts with the pattern
                         if len(pattern_normalized) < len(ipc_normalized):
                             if ipc_normalized.startswith(pattern_normalized):
                                 return sector, field
-
+                
                 except Exception as e:
                     continue
-
+            
             return "N/A", "N/A"
-
+        
         # Apply the matching function to each IPC group
         if "main_ipc_group" in df_main_agg.columns:
             logger.info("Mapping sector and field from IPC codes...")
-
+            
             # Debug: Show unique IPC codes
             unique_ipc = df_main_agg["main_ipc_group"].dropna().unique()
             logger.info(f"Found {len(unique_ipc)} unique IPC codes in data")
             logger.info(f"Sample IPC codes: {list(unique_ipc[:5])}")
-
+            
             # Show what they normalize to
             for ipc in unique_ipc[:5]:
                 normalized = normalize_ipc(ipc)
                 logger.info(f"  IPC: '{ipc}' → Normalized: '{normalized}'")
-
+            
             results = df_main_agg["main_ipc_group"].apply(find_sector_field)
             df_main_agg["sector"] = results.apply(lambda x: x[0])
             df_main_agg["field"] = results.apply(lambda x: x[1])
-
+            
             # Count matches
             matched = (df_main_agg["sector"] != "N/A").sum()
             total = len(df_main_agg)
-            logger.info(
-                f"Successfully mapped {matched}/{total} IPC codes to sector/field"
-            )
+            logger.info(f"Successfully mapped {matched}/{total} IPC codes to sector/field")
         else:
             logger.warning(f"main_ipc_group column NOT found in aggregated table.")
             logger.warning(f"Available columns: {df_main_agg.columns.tolist()}")
             df_main_agg["sector"] = "N/A"
             df_main_agg["field"] = "N/A"
-
+            
     except FileNotFoundError:
-        logger.warning(
-            f"IPC mapping file not found at {ipc_mapping_path}. Setting sector/field to N/A."
-        )
+        logger.warning(f"IPC mapping file not found at {ipc_mapping_path}. Setting sector/field to N/A.")
         df_main_agg["sector"] = "N/A"
         df_main_agg["field"] = "N/A"
     except Exception as e:
@@ -474,24 +443,20 @@ def run_full_analysis(
 
     # Step 8b: Fill empty priority_auth when appln_auth equals family_auth
     logger.info("Step 8b: Filling empty priority_auth values...")
-
+    
     def fill_priority_auth(row):
-        if (
-            pd.isna(row["priority_auth"])
-            or row["priority_auth"] == ""
-            or row["priority_auth"] == "Unknown"
-        ):
-            appln_auth = str(row["appln_auth"]).strip()
-            family_auth = str(row["auth_family"]).strip()
-
+        if pd.isna(row['priority_auth']) or row['priority_auth'] == '' or row['priority_auth'] == 'Unknown':
+            appln_auth = str(row['appln_auth']).strip()
+            family_auth = str(row['auth_family']).strip()
+            
             # If appln_auth and family_auth are the same (single authority), use it
-            if appln_auth == family_auth and appln_auth != "nan" and appln_auth != "":
+            if appln_auth == family_auth and appln_auth != 'nan' and appln_auth != '':
                 return appln_auth
-        return row["priority_auth"]
-
-    df_main_agg["priority_auth"] = df_main_agg.apply(fill_priority_auth, axis=1)
-    df_main_agg["priority_auth"] = df_main_agg["priority_auth"].fillna("Unknown")
-
+        return row['priority_auth']
+    
+    df_main_agg['priority_auth'] = df_main_agg.apply(fill_priority_auth, axis=1)
+    df_main_agg['priority_auth'] = df_main_agg['priority_auth'].fillna('Unknown')
+    
     logger.info("Priority authority fill complete.")
 
     # Step 8c: Reorganize main_table_agg columns
@@ -501,61 +466,99 @@ def run_full_analysis(
         "application_number",
         "appln_auth",
         "auth_family",
-        "priority_auth",
+        "priority_auth"
     ]
-
+    
     # Identify class columns (IPC/CPC)
-    class_cols = [
-        col
-        for col in df_main_agg.columns
-        if "class" in col.lower() or "ipc" in col.lower()
-    ]
-
+    class_cols = [col for col in df_main_agg.columns if 'class' in col.lower() or 'ipc' in col.lower()]
+    
     # Identify sector and field columns
     sector_field_cols = []
     if "sector" in df_main_agg.columns:
         sector_field_cols.append("sector")
     if "field" in df_main_agg.columns:
         sector_field_cols.append("field")
-
+    
     # Get remaining columns
-    remaining_columns = [
-        col
-        for col in df_main_agg.columns
-        if col not in key_columns
-        and col not in class_cols
-        and col not in sector_field_cols
-    ]
-
+    remaining_columns = [col for col in df_main_agg.columns 
+                         if col not in key_columns and col not in class_cols and col not in sector_field_cols]
+    
     # New order: key columns + other columns + class columns + sector + field
-    final_column_order = (
-        key_columns + remaining_columns + class_cols + sector_field_cols
-    )
-
+    final_column_order = key_columns + remaining_columns + class_cols + sector_field_cols
+    
     # Keep only columns that exist
-    final_column_order = [
-        col for col in final_column_order if col in df_main_agg.columns
-    ]
+    final_column_order = [col for col in final_column_order if col in df_main_agg.columns]
     df_main_agg = df_main_agg[final_column_order]
-
+    
     logger.info(f"Final column order: {', '.join(final_column_order[:10])}...")
-
+    
     # **SAVE THE FINAL AGGREGATED TABLE WITH SECTOR AND FIELD**
     agg_output_path = target_dir / "main_table_agg.csv"
     df_main_agg.to_csv(agg_output_path, index=False)
-    logger.info(
-        f"Saved final aggregated data with sector and field to {agg_output_path}"
-    )
+    logger.info(f"Saved final aggregated data with sector and field to {agg_output_path}")
 
     # Step 9: Get applicant/inventor data
     logger.info("Step 9: Getting applicants/inventors data...")
     _, df_applicants_inventors = get_applicants_inventors_data(family_ids_path)
+    
+    # Save applicants/inventors data (raw counts)
+    if save_results and not df_applicants_inventors.empty:
+        applicants_inventors_path = target_dir / "applicants_inventors_by_country.csv"
+        df_applicants_inventors.to_csv(applicants_inventors_path, index=False)
+        logger.info(f"Saved applicants/inventors data to {applicants_inventors_path}")
+
+    # Step 9b: Create applicants/inventors analysis with ratios (if data exists)
+    logger.info("Step 9b: Creating applicants/inventors analysis with ratios...")
+    
+    if not df_applicants_inventors.empty:
+        # Create a copy for analysis
+        df_analysis = df_applicants_inventors.copy()
+        
+        # Calculate totals per family for each metric
+        family_totals = df_analysis.groupby('docdb_family_id').agg({
+            'applicant_count': 'sum',
+            'inventor_count': 'sum'
+        }).reset_index()
+        family_totals.columns = ['docdb_family_id', 'total_applicants', 'total_inventors']
+        
+        # Merge totals back
+        df_analysis = df_analysis.merge(family_totals, on='docdb_family_id', how='left')
+        
+        # Calculate ratios
+        df_analysis['applicant_ratio'] = df_analysis.apply(
+            lambda row: row['applicant_count'] / row['total_applicants'] if row['total_applicants'] > 0 else 0,
+            axis=1
+        )
+        df_analysis['inventor_ratio'] = df_analysis.apply(
+            lambda row: row['inventor_count'] / row['total_inventors'] if row['total_inventors'] > 0 else 0,
+            axis=1
+        )
+        
+        # Calculate combined ratio
+        df_analysis['combined_count'] = df_analysis['applicant_count'] + df_analysis['inventor_count']
+        df_analysis['total_combined'] = df_analysis['total_applicants'] + df_analysis['total_inventors']
+        df_analysis['combined_ratio'] = df_analysis.apply(
+            lambda row: row['combined_count'] / row['total_combined'] if row['total_combined'] > 0 else 0,
+            axis=1
+        )
+        
+        # Save analysis file
+        if save_results:
+            analysis_path = target_dir / "applicants_inventors_analysis.csv"
+            # Select only the relevant columns
+            df_analysis_output = df_analysis[[
+                'docdb_family_id', 'person_ctry_code', 'applicant_count', 'inventor_count',
+                'combined_count', 'applicant_ratio', 'inventor_ratio', 'combined_ratio'
+            ]]
+            df_analysis_output.to_csv(analysis_path, index=False)
+            logger.info(f"Saved applicants/inventors analysis to {analysis_path}")
+    else:
+        logger.warning("No applicants/inventors data available for analysis.")
+        df_analysis = pd.DataFrame()
 
     # Step 10: Final merge
     logger.info("Step 10: Merging all data on 'docdb_family_id'...")
-    df_final = pd.merge(
-        df_main_agg, df_applicants_inventors, on="docdb_family_id", how="left"
-    )
+    df_final = pd.merge(df_main_agg, df_applicants_inventors, on="docdb_family_id", how="left")
 
     # Step 11: Save results if requested
     if save_results:
@@ -563,7 +566,9 @@ def run_full_analysis(
         df_final.to_csv(final_path, index=False)
         logger.info(f"Saved final merged data to {final_path}")
 
-    logger.info(f"Analysis complete. Processed {len(df_family_ids)} families.")
+    logger.info(
+        f"Analysis complete. Processed {len(df_family_ids)} families."
+    )
 
     return df_final
 
@@ -575,23 +580,21 @@ if __name__ == "__main__":
         format=Config.LOG_FORMAT,
     )
 
-    print("\n" + "=" * 80)
-    print("PATENT LANDSCAPE ANALYSIS TOOL")
-    print("=" * 80 + "\n")
-
+    print("\n" + "="*80)
+    print("PATENT ANALYSIS TOOL: Applicants and Inventors")
+    print("="*80 + "\n")
+    
     # Get user input
     try:
         # Get country code
         while True:
-            country_input = (
-                input("Enter country code (e.g., NO, US, DE, CH): ").strip().upper()
-            )
+            country_input = input("Enter country code (e.g., NO, US, DE, CH): ").strip().upper()
             if len(country_input) == 2 and country_input.isalpha():
                 COUNTRY = country_input
                 break
             else:
                 print("  ✗ Invalid! Please enter a 2-letter country code.\n")
-
+        
         # Get start year
         while True:
             try:
@@ -603,7 +606,7 @@ if __name__ == "__main__":
                     print("  ✗ Year must be between 1900 and 2100.\n")
             except ValueError:
                 print("  ✗ Invalid! Please enter a valid year.\n")
-
+        
         # Get end year
         while True:
             try:
@@ -615,13 +618,11 @@ if __name__ == "__main__":
                     print(f"  ✗ End year must be >= {START_YEAR} and <= 2100.\n")
             except ValueError:
                 print("  ✗ Invalid! Please enter a valid year.\n")
-
+        
         # Get optional range limit
         while True:
             try:
-                range_limit_input = input(
-                    "Enter max number of families to process (or press Enter for unlimited): "
-                ).strip()
+                range_limit_input = input("Enter max number of families to process (or press Enter for unlimited): ").strip()
                 if range_limit_input == "":
                     RANGE_LIMIT = None
                     break
@@ -633,27 +634,25 @@ if __name__ == "__main__":
                         print("  ✗ Must be a positive number.\n")
             except ValueError:
                 print("  ✗ Invalid! Please enter a valid number.\n")
-
+        
         # Confirm before running
-        print("\n" + "=" * 80)
+        print("\n" + "="*80)
         print("ANALYSIS PARAMETERS:")
         print(f"  Country Code: {COUNTRY}")
         print(f"  Start Year:   {START_YEAR}")
         print(f"  End Year:     {END_YEAR}")
         print(f"  Limit:        {RANGE_LIMIT if RANGE_LIMIT else 'Unlimited'}")
-        print("=" * 80 + "\n")
-
+        print("="*80 + "\n")
+        
         confirm = input("Start analysis? (y/n): ").strip().lower()
-        if confirm != "y":
+        if confirm != 'y':
             print("✗ Analysis cancelled.")
             sys.exit(0)
-
-        print("\n" + "=" * 80)
+        
+        print("\n" + "="*80)
         logger.info("Running patent analysis from __main__ ...")
-        logger.info(
-            f"Parameters: Country={COUNTRY}, Years={START_YEAR}-{END_YEAR}, Limit={RANGE_LIMIT}"
-        )
-
+        logger.info(f"Parameters: Country={COUNTRY}, Years={START_YEAR}-{END_YEAR}, Limit={RANGE_LIMIT}")
+        
         df_final_result = run_full_analysis(
             country_code=COUNTRY,
             start_year=START_YEAR,
@@ -663,10 +662,10 @@ if __name__ == "__main__":
         )
 
         logger.info("Analysis pipeline completed successfully!")
-        print("=" * 80)
+        print("="*80)
         print("✓ ANALYSIS COMPLETE!")
-        print("=" * 80 + "\n")
-
+        print("="*80 + "\n")
+        
     except KeyboardInterrupt:
         print("\n\n✗ Analysis interrupted by user.")
         sys.exit(1)
